@@ -15,40 +15,41 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.ZipOutputStream;
 
-public class Zip {
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+
+public class Tar {
 
 	public static void main(String[] args) throws IOException {
-//		compress(new File("src"), new File("ziptest.zip"));
-//		uncompress(new File("ziptest.zip"), new File("ziptest"));
-		System.out.println(listFiles(new File("ziptest.zip")));
+//		compress(new File("src"), new File("tartest.tar"));
+//		uncompress(new File("tartest.tar"), new File("tartest"));
+		System.out.println(listFiles(new File("tartest.tar")));
 	}
 
-	public static List<String> listFiles(File zipFile) throws IOException {
+	public static List<String> listFiles(File tarFile) throws IOException {
 		List<String> ret = new ArrayList<>();
-		ZipInputStream zips = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile)));
-		ZipEntry entry = null;
-		while ((entry = zips.getNextEntry()) != null) {
+		TarArchiveInputStream tips = new TarArchiveInputStream(new BufferedInputStream(new FileInputStream(tarFile)));
+		TarArchiveEntry entry = null;
+		while ((entry = tips.getNextTarEntry()) != null) {
 			ret.add(entry.getName());
 		}
-		zips.close();
+		tips.close();
 		return ret;
 	}
 
-	public static void uncompress(File zipFile, File dest) throws IOException {
+	public static void uncompress(File tarFile, File dest) throws IOException {
 		if (!dest.exists()) {
 			dest.mkdirs();
 		}
 		if (!dest.isDirectory()) {
 			throw new IllegalArgumentException("Argument dest must be a directory");
 		}
-		ZipInputStream zips = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile)));
+		TarArchiveInputStream tips = new TarArchiveInputStream(new BufferedInputStream(new FileInputStream(tarFile)));
 		byte[] data = new byte[2048];
-		ZipEntry entry = null;
-		while ((entry = zips.getNextEntry()) != null) {
+		TarArchiveEntry entry = null;
+		while ((entry = tips.getNextTarEntry()) != null) {
 			if (entry.isDirectory()) {
 				new File(dest, entry.getName()).mkdirs();
 			} else {
@@ -58,19 +59,19 @@ public class Zip {
 				}
 				OutputStream ops = new BufferedOutputStream(new FileOutputStream(f));
 				int size = -1;
-				while ((size = zips.read(data)) != -1) {
+				while ((size = tips.read(data)) != -1) {
 					ops.write(data, 0, size);
 				}
 				ops.close();
 			}
 		}
-		zips.close();
+		tips.close();
 	}
 
-	public static void compress(File src, File zipFile) throws IOException {
-		zipFile = new File(zipFile.getCanonicalPath());
-		if (!zipFile.getParentFile().exists()) {
-			zipFile.getParentFile().mkdirs();
+	public static void compress(File src, File tarFile) throws IOException {
+		tarFile = new File(tarFile.getCanonicalPath());
+		if (!tarFile.getParentFile().exists()) {
+			tarFile.getParentFile().mkdirs();
 		}
 
 		final List<File> files = new ArrayList<>();
@@ -90,9 +91,8 @@ public class Zip {
 		Files.walkFileTree(src.toPath(), visitor);
 		int beginIndex = src.getCanonicalPath().lastIndexOf(src.getName());
 
-		OutputStream ops = new BufferedOutputStream(new FileOutputStream(zipFile));
-		ZipOutputStream zops = new ZipOutputStream(ops);
-		zops.setLevel(9);
+		OutputStream ops = new BufferedOutputStream(new FileOutputStream(tarFile));
+		TarArchiveOutputStream tops = new TarArchiveOutputStream(ops);
 		byte[] buffer = new byte[2048];
 		for (File file : files) {
 			String path = file.getCanonicalPath();
@@ -100,18 +100,19 @@ public class Zip {
 			if (file.isDirectory()) {
 				path = path + "/";
 			}
-			ZipEntry entry = new ZipEntry(path);
-			zops.putNextEntry(entry);
+			TarArchiveEntry entry = (TarArchiveEntry) tops.createArchiveEntry(file, path);
+			tops.putArchiveEntry(entry);
 			if (file.isFile()) {
 				InputStream ips = new BufferedInputStream(new FileInputStream(file));
 				int size = -1;
 				while ((size = ips.read(buffer)) != -1) {
-					zops.write(buffer, 0, size);
+					tops.write(buffer, 0, size);
 				}
 				ips.close();
 			}
-			zops.closeEntry();
+			tops.closeArchiveEntry();
 		}
-		zops.close();
+		tops.close();
 	}
+
 }
